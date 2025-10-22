@@ -2,6 +2,9 @@
 
 A PyQt5 GUI front-end for wget specialized for downloading open directory listings. This tool provides a user-friendly interface to configure and execute wget commands for downloading entire directory structures from web servers.
 
+![Screenshot](https://i.postimg.cc/L5D99FGM/wgetgui.png)
+
+
 ## Features
 
 - **GUI Interface**: Easy-to-use graphical interface for configuring wget options
