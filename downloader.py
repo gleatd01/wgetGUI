@@ -44,11 +44,13 @@ class DirectoryParser(HTMLParser):
         if tag == 'a':
             for attr, value in attrs:
                 if attr == 'href':
-                    # Skip parent directory links and anchors
+                    # Skip parent directory links, current directory, anchors, and query params
                     if value and not value.startswith('#') and not value.startswith('?'):
-                        # Resolve relative URLs
-                        full_url = urllib.parse.urljoin(self.base_url, value)
-                        self.links.append(full_url)
+                        # Filter out parent (..) and current (.) directory references
+                        if value not in ['../', '../', './', '.']:
+                            # Resolve relative URLs
+                            full_url = urllib.parse.urljoin(self.base_url, value)
+                            self.links.append(full_url)
                     break
 
 
@@ -706,9 +708,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 
                 # Filter matching files
                 for link in parser.links:
-                    # Get filename from URL
-                    filename = os.path.basename(urllib.parse.urlparse(link).path).lower()
-                    if search_text in filename:
+                    # Get filename from URL (cross-platform compatible)
+                    parsed = urllib.parse.urlparse(link)
+                    filename = parsed.path.split('/')[-1].lower()
+                    if filename and search_text in filename:
                         matching_files.append(link)
                         self.append_log(f"  Found: {link}")
                 
@@ -786,7 +789,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.execute_multi_wget(urls)
     
     def execute_multi_wget(self, urls):
-        """Execute wget for multiple URLs sequentially."""
+        """Execute wget for multiple URLs sequentially.
+        Note: Uses synchronous subprocess calls which will block the UI during downloads.
+        For better UX with many files, consider implementing async downloads.
+        """
         dest = self.dest_edit.text().strip()
         wget_cmd = shutil.which("wget") or "wget"
         
@@ -797,7 +803,11 @@ class MainWindow(QtWidgets.QMainWindow):
         
         total = len(urls)
         for idx, url in enumerate(urls):
-            self.append_log(f"\nDownloading {idx + 1}/{total}: {url}")
+            # Extract filename from URL (cross-platform compatible)
+            parsed = urllib.parse.urlparse(url)
+            filename = parsed.path.split('/')[-1] or 'file'
+            
+            self.append_log(f"\nDownloading {idx + 1}/{total}: {filename}")
             
             # Build argv for this file
             argv = [wget_cmd, "-P", dest]
@@ -812,7 +822,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 if result.stderr:
                     self.append_log(result.stderr)
                 if result.returncode == 0:
-                    self.append_log(f"Successfully downloaded: {os.path.basename(url)}")
+                    self.append_log(f"Successfully downloaded: {filename}")
                 else:
                     self.append_log(f"Failed to download: {url} (exit code {result.returncode})")
             except subprocess.TimeoutExpired:
